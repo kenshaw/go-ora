@@ -1,4 +1,4 @@
-package converters
+package conv
 
 import (
 	"encoding/binary"
@@ -16,17 +16,11 @@ type StringConverter struct {
 
 func MaxBytePerChar(charsetID int) int {
 	switch charsetID {
-	case 870:
-		fallthrough
-	case 871:
+	case 870, 871:
 		return 3
-	case 872:
-		fallthrough
-	case 873:
+	case 872, 873:
 		return 4
-	case 2000:
-		fallthrough
-	case 2002:
+	case 2000, 2002:
 		return 2
 	default:
 		return 1
@@ -39,13 +33,7 @@ func (conv *StringConverter) Encode(input string) []byte {
 	}
 	temp := utf16.Encode([]rune(input))
 	switch conv.LangID {
-	case 870:
-		fallthrough
-	case 871:
-		fallthrough
-	case 872:
-		fallthrough
-	case 873: // 32bit utf-8
+	case 870, 871, 872, 873: // 32bit utf-8
 		// utf-8 encoding
 		return []byte(input)
 	case 2000:
@@ -85,13 +73,7 @@ func (conv *StringConverter) Decode(input []byte) string {
 		return ""
 	}
 	switch conv.LangID {
-	case 870:
-		fallthrough
-	case 871:
-		fallthrough
-	case 872:
-		fallthrough
-	case 873:
+	case 870, 871, 872, 873:
 		// utf-8 encoding
 		return string(input)
 	case 2000:
@@ -132,7 +114,6 @@ func (conv *StringConverter) Decode(input []byte) string {
 					output[x] = uint16(conv.dReplace)
 				}
 			}
-
 		}
 		return string(utf16.Decode(output))
 	}

@@ -1,3 +1,4 @@
+// _example/hello_sql/main.go
 package main
 
 import (

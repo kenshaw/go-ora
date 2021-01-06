@@ -14,6 +14,7 @@ type ClientData struct {
 	DriverName  string
 	PID         int
 }
+
 type ConnectionOption struct {
 	Port                  int
 	TransportConnectTo    int
@@ -24,16 +25,16 @@ type ConnectionOption struct {
 	Protocol              string
 	Host                  string
 	UserID                string
-	//IP string
+	// IP string
 	SID string
-	//Addr string
-	//Server string
+	// Addr string
+	// Server string
 	ServiceName  string
 	InstanceName string
 	DomainName   string
 	DBName       string
 	ClientData   ClientData
-	//InAddrAny bool
+	// InAddrAny bool
 	Tracer   trace.Tracer
 	connData string
 }

@@ -5,13 +5,14 @@ type BindError struct {
 	rowOffset int
 	errorMsg  []byte
 }
+
 type SummaryObject struct {
 	EndOfCallStatus      int // uint32
 	EndToEndECIDSequence int // uint16
 	CurRowNumber         int // uint32
 	RetCode              int // uint16
 	arrayElmWError       int // uint16
-	arrayElmErrno        int //uint16
+	arrayElmErrno        int // uint16
 	CursorID             int // uint16
 	errorPos             int // uint16
 	sqlType              uint8
@@ -210,7 +211,6 @@ func NewSummary(session *Session) (*SummaryObject, error) {
 			return nil, err
 		}
 	}
-
 	//if result.sqlType == 3 && result.RetCode == 1403 {
 	//	_, _ = session.GetClr()
 	//} else if result.RetCode != 0 {

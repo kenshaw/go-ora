@@ -2,19 +2,19 @@ package network
 
 import "encoding/binary"
 
-//type AcceptPacket Packet
+// type AcceptPacket Packet
 type AcceptPacket struct {
 	packet     Packet
 	sessionCtx SessionContext
 	buffer     []byte
 }
 
-func (pck *AcceptPacket) bytes() []byte {
-	output := pck.packet.bytes()
-	//output := make([]byte, pck.dataOffset)
-	//binary.BigEndian.PutUint16(output[0:], pck.packet.length)
-	//output[4] = uint8(pck.packet.packetType)
-	//output[5] = pck.packet.flag
+func (pck *AcceptPacket) Bytes() []byte {
+	output := pck.packet.Bytes()
+	// output := make([]byte, pck.dataOffset)
+	// binary.BigEndian.PutUint16(output[0:], pck.packet.length)
+	// output[4] = uint8(pck.packet.packetType)
+	// output[5] = pck.packet.flag
 	binary.BigEndian.PutUint16(output[8:], pck.sessionCtx.Version)
 	binary.BigEndian.PutUint16(output[10:], pck.sessionCtx.Options)
 	binary.BigEndian.PutUint16(output[12:], pck.sessionCtx.SessionDataUnit)
@@ -27,6 +27,7 @@ func (pck *AcceptPacket) bytes() []byte {
 	output = append(output, pck.buffer...)
 	return output
 }
+
 func (pck *AcceptPacket) getPacketType() PacketType {
 	return pck.packet.packetType
 }
@@ -50,7 +51,6 @@ func (pck *AcceptPacket) getPacketType() PacketType {
 //	}
 //	return &pck
 //}
-
 func newAcceptPacketFromData(packetData []byte) *AcceptPacket {
 	if len(packetData) < 32 {
 		return nil

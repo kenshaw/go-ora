@@ -10,13 +10,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sijms/go-ora/converters"
+	"github.com/sijms/go-ora/conv"
 )
 
 type Data interface {
 	Write(session *Session) error
 	Read(session *Session) error
 }
+
 type sessionState struct {
 	summary   *SummaryObject
 	sendPcks  []PacketInterface
@@ -24,6 +25,7 @@ type sessionState struct {
 	outBuffer []byte
 	index     int
 }
+
 type Session struct {
 	conn              net.Conn
 	connOption        ConnectionOption
@@ -41,7 +43,7 @@ type Session struct {
 	HasFSAPCapability bool
 	Summary           *SummaryObject
 	states            []sessionState
-	StrConv           *converters.StringConverter
+	StrConv           *conv.StringConverter
 }
 
 func NewSession(connOption ConnectionOption) *Session {
@@ -93,7 +95,6 @@ func (session *Session) Connect() error {
 	} else {
 		host = session.connOption.Host
 	}
-
 	session.conn, err = net.Dial(session.connOption.Protocol, host)
 	if err != nil {
 		return err
@@ -114,7 +115,6 @@ func (session *Session) Connect() error {
 	if err != nil {
 		return err
 	}
-
 	if acceptPacket, ok := pck.(*AcceptPacket); ok {
 		*session.Context = acceptPacket.sessionCtx
 		return nil
@@ -141,7 +141,6 @@ func (session *Session) Connect() error {
 		return session.Connect()
 	}
 	return errors.New("connection refused by the server")
-
 	//for {
 	//	err = session.writePacket(newConnectPacket(*session.Context))
 	//
@@ -177,7 +176,7 @@ func (session *Session) ResetBuffer() {
 }
 
 func (session *Session) Debug() {
-	//if session.index > 350 && session.index < 370 {
+	// if session.index > 350 && session.index < 370 {
 	fmt.Println("index: ", session.index)
 	fmt.Printf("data buffer: %#v\n", session.inBuffer[session.index:session.index+30])
 	oldIndex := session.index
@@ -185,6 +184,7 @@ func (session *Session) Debug() {
 	session.index = oldIndex
 	//}
 }
+
 func (session *Session) DumpIn() {
 	log.Printf("%#v\n", session.inBuffer)
 }
@@ -198,7 +198,7 @@ func (session *Session) Write() error {
 	if size == 0 {
 		// send empty data packet
 		return session.writePacket(newDataPacket(nil))
-		//return errors.New("the output buffer is empty")
+		// return errors.New("the output buffer is empty")
 	}
 	segment := uint(session.Context.SessionDataUnit - 20)
 	offset := uint(0)
@@ -244,7 +244,7 @@ func (session *Session) read(numBytes int) ([]byte, error) {
 //}
 func (session *Session) writePacket(pck PacketInterface) error {
 	session.sendPcks = append(session.sendPcks, pck)
-	tmp := pck.bytes()
+	tmp := pck.Bytes()
 	session.connOption.Tracer.LogPacket("Write packet:", tmp)
 	_, err := session.conn.Write(tmp)
 	if err != nil {
@@ -269,7 +269,6 @@ func (session *Session) GetError() string {
 }
 
 func (session *Session) readPacket() (PacketInterface, error) {
-
 	readPacketData := func(conn net.Conn) ([]byte, error) {
 		trials := 0
 		for {
@@ -300,8 +299,8 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			pckType := PacketType(head[4])
 			if pckType == RESEND {
 				for _, pck := range session.sendPcks {
-					//log.Printf("Request: %#v\n\n", pck.bytes())
-					_, err := session.conn.Write(pck.bytes())
+					// log.Printf("Request: %#v\n\n", pck.Bytes())
+					_, err := session.conn.Write(pck.Bytes())
 					if err != nil {
 						return nil, err
 					}
@@ -312,15 +311,13 @@ func (session *Session) readPacket() (PacketInterface, error) {
 			session.connOption.Tracer.LogPacket("Read packet:", ret)
 			return ret, nil
 		}
-
 	}
-
 	packetData, err := readPacketData(session.conn)
 	if err != nil {
 		return nil, err
 	}
 	pckType := PacketType(packetData[4])
-	//log.Printf("Response: %#v\n\n", packetData)
+	// log.Printf("Response: %#v\n\n", packetData)
 	switch pckType {
 	case ACCEPT:
 		return newAcceptPacketFromData(packetData), nil
@@ -337,7 +334,7 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		} else {
 			data = string(packetData[10 : 10+dataLen])
 		}
-		//fmt.Println("data returned: ", data)
+		// fmt.Println("data returned: ", data)
 		length := strings.Index(data, "\x00")
 		if pck.packet.flag&2 != 0 && length > 0 {
 			pck.redirectAddr = data[:length]
@@ -345,10 +342,9 @@ func (session *Session) readPacket() (PacketInterface, error) {
 		} else {
 			pck.redirectAddr = data
 		}
-		//fmt.Println("redirect address: ", pck.redirectAddr)
-		//fmt.Println("reconnect data: ", pck.reconnectData)
-		//session.Disconnect()
-
+		// fmt.Println("redirect address: ", pck.redirectAddr)
+		// fmt.Println("reconnect data: ", pck.reconnectData)
+		// session.Disconnect()
 		// if the length > dataoffset use data in the packet
 		// else get data from the server
 		// disconnect the current session
@@ -440,33 +436,7 @@ func (session *Session) PutBytes(data ...byte) {
 //func (session *Session) PutByte(num byte) {
 //		session.outBuffer = append(session.outBuffer, num)
 //}
-
-func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, compress bool) {
-	var num uint64
-	switch number := number.(type) {
-	case int64:
-		num = uint64(number)
-	case int32:
-		num = uint64(number)
-	case int16:
-		num = uint64(number)
-	case int8:
-		num = uint64(number)
-	case uint64:
-		num = number
-	case uint32:
-		num = uint64(number)
-	case uint16:
-		num = uint64(number)
-	case uint8:
-		num = uint64(number)
-	case uint:
-		num = uint64(number)
-	case int:
-		num = uint64(number)
-	default:
-		panic("you need to pass an integer to this function")
-	}
+func (session *Session) PutUint64(num uint64, size uint8, bigEndian bool, compress bool) {
 	if size == 1 {
 		session.outBuffer = append(session.outBuffer, uint8(num))
 		return
@@ -510,33 +480,7 @@ func (session *Session) PutUint(number interface{}, size uint8, bigEndian bool, 
 	}
 }
 
-func (session *Session) PutInt(number interface{}, size uint8, bigEndian bool, compress bool) {
-	var num int64
-	switch number := number.(type) {
-	case int64:
-		num = number
-	case int32:
-		num = int64(number)
-	case int16:
-		num = int64(number)
-	case int8:
-		num = int64(number)
-	case uint64:
-		num = int64(number)
-	case uint32:
-		num = int64(number)
-	case uint16:
-		num = int64(number)
-	case uint8:
-		num = int64(number)
-	case uint:
-		num = int64(number)
-	case int:
-		num = int64(number)
-	default:
-		panic("you need to pass an integer to this function")
-	}
-
+func (session *Session) PutInt64(num int64, size uint8, bigEndian bool, compress bool) {
 	if compress {
 		temp := make([]byte, 8)
 		binary.BigEndian.PutUint64(temp, uint64(num))
@@ -616,24 +560,26 @@ func (session *Session) PutKeyVal(key []byte, val []byte, num uint8) {
 	if len(key) == 0 {
 		session.outBuffer = append(session.outBuffer, 0)
 	} else {
-		session.PutUint(len(key), 4, true, true)
+		session.PutUint64(uint64(len(key)), 4, true, true)
 		session.PutClr(key)
 	}
 	if len(val) == 0 {
 		session.outBuffer = append(session.outBuffer, 0)
 	} else {
-		session.PutUint(len(val), 4, true, true)
+		session.PutUint64(uint64(len(val)), 4, true, true)
 		session.PutClr(val)
 	}
-	session.PutInt(num, 4, true, true)
+	session.PutInt64(int64(num), 4, true, true)
 }
 
 func (session *Session) PutData(data Data) error {
 	return data.Write(session)
 }
+
 func (session *Session) GetData(data Data) error {
 	return data.Read(session)
 }
+
 func (session *Session) GetByte() (uint8, error) {
 	rb, err := session.read(1)
 	if err != nil {
@@ -670,7 +616,7 @@ func (session *Session) GetInt64(size int, compress bool, bigEndian bool) (int64
 		ret = int64(binary.BigEndian.Uint64(temp))
 	} else {
 		copy(temp[:size], rb)
-		//temp = append(pck.buffer[pck.index: pck.index + size], temp...)
+		// temp = append(pck.buffer[pck.index: pck.index + size], temp...)
 		ret = int64(binary.LittleEndian.Uint64(temp))
 	}
 	if negFlag {
@@ -678,6 +624,7 @@ func (session *Session) GetInt64(size int, compress bool, bigEndian bool) (int64
 	}
 	return ret, nil
 }
+
 func (session *Session) GetInt(size int, compress bool, bigEndian bool) (int, error) {
 	temp, err := session.GetInt64(size, compress, bigEndian)
 	if err != nil {
@@ -685,6 +632,7 @@ func (session *Session) GetInt(size int, compress bool, bigEndian bool) (int, er
 	}
 	return int(temp), nil
 }
+
 func (session *Session) GetNullTermString(maxSize int) (result string, err error) {
 	oldIndex := session.index
 	temp, err := session.read(maxSize)

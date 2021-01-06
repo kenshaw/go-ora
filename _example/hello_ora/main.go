@@ -1,3 +1,4 @@
+// _example/hello_ora/main.go
 package main
 
 import (
@@ -7,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	go_ora "github.com/sijms/go-ora"
+	ora "github.com/sijms/go-ora"
 )
 
 func dieOnError(msg string, err error) {
@@ -29,7 +30,7 @@ func main() {
 	}
 	connStr := os.ExpandEnv(os.Args[1])
 
-	conn, err := go_ora.NewConnection(connStr)
+	conn, err := ora.NewConnection(connStr)
 	dieOnError("Can't create connection:", err)
 
 	err = conn.Open()
@@ -41,7 +42,7 @@ func main() {
 	dieOnError("Can't ping connection:", err)
 
 	fmt.Println("\nSuccessfully connected.\n")
-	stmt := go_ora.NewStmt("SELECT * FROM v$version", conn)
+	stmt := ora.NewStmt("SELECT * FROM v$version", conn)
 	defer stmt.Close()
 
 	rows, err := stmt.Query(nil)

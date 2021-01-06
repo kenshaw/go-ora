@@ -10,8 +10,8 @@ type DataPacket struct {
 	buffer   []byte
 }
 
-func (pck *DataPacket) bytes() []byte {
-	output := pck.packet.bytes()
+func (pck *DataPacket) Bytes() []byte {
+	output := pck.packet.Bytes()
 	binary.BigEndian.PutUint16(output[8:], pck.dataFlag)
 	if len(pck.buffer) > 0 {
 		output = append(output, pck.buffer...)
@@ -22,6 +22,7 @@ func (pck *DataPacket) bytes() []byte {
 func (pck *DataPacket) getPacketType() PacketType {
 	return pck.packet.packetType
 }
+
 func newDataPacket(initialData []byte) *DataPacket {
 	return &DataPacket{
 		packet: Packet{

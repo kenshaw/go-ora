@@ -1,15 +1,70 @@
-package go_ora
+package ora
+
+//go:generate stringer -type=Type -trimprefix=Type
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
-	"github.com/sijms/go-ora/network"
 	"time"
+
+	"github.com/sijms/go-ora/network"
+)
+
+// Type is the type enum.
+type Type int
+
+// Type values.
+const (
+	TypeNCHAR            Type = 1
+	TypeNUMBER           Type = 2
+	TypeSB1              Type = 3
+	TypeSB2              Type = 3
+	TypeSB4              Type = 3
+	TypeFLOAT            Type = 4
+	TypeNullStr          Type = 5
+	TypeVarNum           Type = 6
+	TypeLONG             Type = 8
+	TypeVARCHAR          Type = 9
+	TypeROWID            Type = 11
+	TypeDATE             Type = 12
+	TypeVarRaw           Type = 15
+	TypeBFloat           Type = 21
+	TypeBDouble          Type = 22
+	TypeRAW              Type = 23
+	TypeLongRaw          Type = 24
+	TypeUINT             Type = 68
+	TypeLongVarChar      Type = 94
+	TypeLongVarRaw       Type = 95
+	TypeCHAR             Type = 96
+	TypeCHARZ            Type = 97
+	TypeIBFloat          Type = 100
+	TypeIBDouble         Type = 101
+	TypeRefCursor        Type = 102
+	TypeNOT              Type = 108
+	TypeXMLType          Type = 108
+	TypeOCIRef           Type = 110
+	TypeOCIClobLocator   Type = 112
+	TypeOCIBlobLocator   Type = 113
+	TypeOCIFileLocator   Type = 114
+	TypeResultSet        Type = 116
+	TypeOCIString        Type = 155
+	TypeOCIDate          Type = 156
+	TypeTimestampDTY     Type = 180
+	TypeTimestampTZ_DTY  Type = 181
+	TypeIntervalYM_DTY   Type = 182
+	TypeIntervalDS_DTY   Type = 183
+	TypeTimeTZ           Type = 186
+	TypeTimestamp        Type = 187
+	TypeTimestampTZ      Type = 188
+	TypeIntervalYM       Type = 189
+	TypeIntervalDS       Type = 190
+	TypeUROWID           Type = 208
+	TypeTimestampLTZ_DTY Type = 231
+	TypeTimestampLTZ     Type = 232
 )
 
 type DataTypeNego struct {
-	MessageCode        uint8
+	Code               uint8
 	Server             *TCPNego
 	TypeAndRep         []int16
 	RuntimeTypeAndRep  []int16
@@ -60,17 +115,18 @@ func (n *DataTypeNego) addTypeRep(dty int16, ndty int16, rep int16) {
 	}
 }
 
-func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, error) {
+func buildTypeNego(nego *TCPNego, sess *network.Session) (*DataTypeNego, error) {
 	result := DataTypeNego{
-		MessageCode: 2,
-		Server:      nego,
-		TypeAndRep:  make([]int16, bufferGrow),
+		Code:       2,
+		Server:     nego,
+		TypeAndRep: make([]int16, bufferGrow),
 		CompileTimeCaps: []byte{
 			6, 1, 0, 0, 10, 1, 1, 6,
 			1, 1, 1, 1, 1, 1, 0, 0x29,
 			0x90, 3, 7, 3, 0, 1, 0, 0x6B,
 			1, 0, 5, 1, 0, 0, 0, 0,
-			0, 0, 0, 0, 1, 2},
+			0, 0, 0, 0, 1, 2,
+		},
 		RuntimeCap: []byte{2, 1, 0, 0, 0, 0, 0},
 	}
 	if result.Server.ServerCompileTimeCaps == nil ||
@@ -79,7 +135,6 @@ func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, erro
 		result.CompileTimeCaps[37] = 0
 		result.CompileTimeCaps[1] = 0
 	}
-
 	result.TypeAndRep[0] = 1
 	result.addTypeRep(1, 1, 1)
 	result.addTypeRep(2, 2, 10)
@@ -383,27 +438,26 @@ func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, erro
 	} else {
 		result.RuntimeTypeAndRep = result.TypeAndRep
 	}
-	session.ResetBuffer()
-	session.PutBytes(result.bytes()...)
-	err := session.Write()
+	sess.ResetBuffer()
+	sess.PutBytes(result.bytes()...)
+	err := sess.Write()
 	if err != nil {
 		return nil, err
 	}
-	msg, err := session.GetByte()
+	msg, err := sess.GetByte()
 	if err != nil {
 		return nil, err
 	}
 	if msg != 2 {
-		return nil, errors.New(fmt.Sprintf("message code error: received code %d and expected code is 2", msg))
+		return nil, fmt.Errorf("message code error: received code %d and expected code is 2", msg)
 	}
-
 	if result.RuntimeCap[1] == 1 {
-		result.DBTimeZone, err = session.GetBytes(11)
+		result.DBTimeZone, err = sess.GetBytes(11)
 		if err != nil {
 			return nil, err
 		}
 		if result.CompileTimeCaps[37]&2 == 2 {
-			_, _ = session.GetInt(4, false, false)
+			_, _ = sess.GetInt(4, false, false)
 		}
 	}
 	//getNum := func(session *network.Session, flag uint8) (int, error) {
@@ -417,9 +471,9 @@ func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, erro
 	for {
 		var num int
 		if result.CompileTimeCaps[27] == 0 {
-			num, err = session.GetInt(1, false, false)
+			num, err = sess.GetInt(1, false, false)
 		} else {
-			num, err = session.GetInt(2, false, true)
+			num, err = sess.GetInt(2, false, true)
 		}
 		if num == 0 && level == 0 {
 			break
@@ -438,13 +492,13 @@ func buildTypeNego(nego *TCPNego, session *network.Session) (*DataTypeNego, erro
 }
 
 func (nego *DataTypeNego) bytes() []byte {
-	var result = make([]byte, 7, 1000)
+	result := make([]byte, 7, 1000)
 	if nego.Server.ServerCompileTimeCaps == nil || len(nego.Server.ServerCompileTimeCaps) <= 27 || nego.Server.ServerCompileTimeCaps[27] == 0 {
 		nego.CompileTimeCaps[27] = 0
 	}
-	result[0] = nego.MessageCode
-	//binary.BigEndian.PutUint16(result[2:], 0)
-	//binary.BigEndian.PutUint16(result[4:], 0)
+	result[0] = nego.Code
+	// binary.BigEndian.PutUint16(result[2:], 0)
+	// binary.BigEndian.PutUint16(result[4:], 0)
 	result[5] = nego.Server.ServerFlags
 	result[6] = uint8(len(nego.CompileTimeCaps))
 	result = append(result, nego.CompileTimeCaps...)

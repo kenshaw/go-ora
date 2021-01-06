@@ -4,17 +4,17 @@ import "encoding/binary"
 
 type RefusePacket struct {
 	packet Packet
-	//dataOffset uint16
-	//Len uint16
-	//packetType PacketType
-	//Flag uint8
+	// dataOffset uint16
+	// Len uint16
+	// packetType PacketType
+	// Flag uint8
 	SystemReason uint8
 	UserReason   uint8
 	message      string
 }
 
-func (pck *RefusePacket) bytes() []byte {
-	output := pck.packet.bytes()
+func (pck *RefusePacket) Bytes() []byte {
+	output := pck.packet.Bytes()
 	output[8] = pck.SystemReason
 	output[9] = pck.UserReason
 	data := []byte(pck.message)
@@ -26,6 +26,7 @@ func (pck *RefusePacket) bytes() []byte {
 func (pck *RefusePacket) getPacketType() PacketType {
 	return pck.packet.packetType
 }
+
 func newRefusePacketFromData(packetData []byte) *RefusePacket {
 	if len(packetData) < 12 {
 		return nil

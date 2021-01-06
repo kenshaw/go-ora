@@ -11,8 +11,8 @@ type RedirectPacket struct {
 	reconnectData string
 }
 
-func (pck *RedirectPacket) bytes() []byte {
-	output := pck.packet.bytes()
+func (pck *RedirectPacket) Bytes() []byte {
+	output := pck.packet.Bytes()
 	data := append([]byte(pck.redirectAddr), 0)
 	data = append(data, []byte(pck.reconnectData)...)
 	binary.BigEndian.PutUint16(output[8:], uint16(len(data)))
@@ -50,6 +50,7 @@ func newRedirectPacketFromData(packetData []byte) *RedirectPacket {
 	//}
 	return &pck
 }
+
 func (pck *RedirectPacket) findValue(key string) string {
 	redirectAddr := strings.ToUpper(pck.redirectAddr)
 	start := strings.Index(redirectAddr, key)
@@ -69,6 +70,7 @@ func (pck *RedirectPacket) findValue(key string) string {
 		return ""
 	}
 }
+
 func (pck *RedirectPacket) protocol() string {
 	return strings.ToLower(pck.findValue("PROTOCOL"))
 }
@@ -76,6 +78,7 @@ func (pck *RedirectPacket) protocol() string {
 func (pck *RedirectPacket) host() string {
 	return pck.findValue("HOST")
 }
+
 func (pck *RedirectPacket) port() string {
 	return pck.findValue("PORT")
 }

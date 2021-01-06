@@ -2,18 +2,18 @@ package network
 
 import "encoding/binary"
 
-//type ConnectPacket Packet
+// type ConnectPacket Packet
 type ConnectPacket struct {
 	packet     Packet
 	sessionCtx SessionContext
 	buffer     []byte
 }
 
-func (pck *ConnectPacket) bytes() []byte {
-	output := pck.packet.bytes()
-	//binary.BigEndian.PutUint16(output, pck.length)
-	//output[4] = uint8(pck.packetType)
-	//output[5] = pck.flag
+func (pck *ConnectPacket) Bytes() []byte {
+	output := pck.packet.Bytes()
+	// binary.BigEndian.PutUint16(output, pck.length)
+	// output[4] = uint8(pck.packetType)
+	// output[5] = pck.flag
 	binary.BigEndian.PutUint16(output[8:], pck.sessionCtx.Version)
 	binary.BigEndian.PutUint16(output[10:], pck.sessionCtx.LoVersion)
 	binary.BigEndian.PutUint16(output[12:], pck.sessionCtx.Options)
@@ -30,11 +30,12 @@ func (pck *ConnectPacket) bytes() []byte {
 		output = append(output, pck.buffer...)
 	}
 	return output
-
 }
+
 func (pck *ConnectPacket) getPacketType() PacketType {
 	return pck.packet.packetType
 }
+
 func newConnectPacket(sessionCtx SessionContext) *ConnectPacket {
 	connectData := sessionCtx.connOption.ConnectionData()
 	length := uint16(len(connectData))
@@ -42,11 +43,9 @@ func newConnectPacket(sessionCtx SessionContext) *ConnectPacket {
 		length = 0
 	}
 	length += 58
-
 	sessionCtx.Histone = 1
 	sessionCtx.ACFL0 = 4
 	sessionCtx.ACFL1 = 4
-
 	return &ConnectPacket{
 		sessionCtx: sessionCtx,
 		packet: Packet{
@@ -59,6 +58,6 @@ func newConnectPacket(sessionCtx SessionContext) *ConnectPacket {
 	}
 }
 
-//DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=al-maaly)(PORT=1521))(CONNECT_DATA=(
+// DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=al-maaly)(PORT=1521))(CONNECT_DATA=(
 //	SERVICE_NAME=newhospital)(CID=(PROGRAM=D:\projects\DotPeekExtractedProjects\TestClient\bin\Debug\TestClient.exe)
 //	(HOST=LABMANAGER)(USER=lab))))

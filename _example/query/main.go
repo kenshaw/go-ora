@@ -1,3 +1,4 @@
+// _example/query/main.go
 package main
 
 import (
@@ -7,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	go_ora "github.com/sijms/go-ora"
+	ora "github.com/sijms/go-ora"
 )
 
 func dieOnError(msg string, err error) {
@@ -53,14 +54,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	DB, err := go_ora.NewConnection(connStr)
+	DB, err := ora.NewConnection(connStr)
 	dieOnError("Can't open the driver:", err)
 	err = DB.Open()
 	dieOnError("Can't open the connection:", err)
 
 	defer DB.Close()
 
-	stmt := go_ora.NewStmt(query, DB)
+	stmt := ora.NewStmt(query, DB)
 
 	defer stmt.Close()
 
@@ -86,7 +87,6 @@ func main() {
 }
 
 func Header(columns []string) {
-
 }
 
 func Record(columns []string, values []driver.Value) {

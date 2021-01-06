@@ -1,4 +1,4 @@
-package converters
+package conv
 
 import (
 	"bytes"
@@ -53,7 +53,7 @@ func DecodeDate(data []byte) (time.Time, error) {
 		return time.Date(year, time.Month(data[2]), int(data[3]),
 			int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, loc.Location()), nil
 	}
-	//return time.Date(year, time.Month(data[2]), int(data[3]),
+	// return time.Date(year, time.Month(data[2]), int(data[3]),
 	//	int(data[4]-1)+tzHour, int(data[5]-1)+tzMin, int(data[6]-1), nanoSec, time.UTC), nil
 }
 
@@ -62,7 +62,6 @@ func DecodeDate(data []byte) (time.Time, error) {
 func addDigitToMantissa(mantissaIn uint64, d byte) (mantissaOut uint64, carryOut bool) {
 	var carry uint64
 	mantissaOut = mantissaIn
-
 	if mantissaIn != 0 {
 		var over uint64
 		over, mantissaOut = bits.Mul64(mantissaIn, uint64(10))
@@ -89,23 +88,19 @@ func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int,
 	if inputData[0] == 0x80 {
 		return 0, false, 0, 0, nil
 	}
-
 	negative = inputData[0]&0x80 == 0
 	if negative {
 		exponent = int(inputData[0]^0x7f) - 64
 	} else {
 		exponent = int(inputData[0]&0x7f) - 64
 	}
-
 	buf := inputData[1:]
 	// When negative, strip the last byte if equal 0x66
 	if negative && inputData[len(inputData)-1] == 0x66 {
 		buf = inputData[1 : len(inputData)-1]
 	}
-
 	carry := false // get true when mantissa exceeds 64 bits
 	firstDigitWasZero := 0
-
 	// Loop on mantissa digits, stop with the capacity of int64 is reached
 	// Beyond, digits will be lost during convertion t
 	mantissaDigits = 0
@@ -117,20 +112,17 @@ func FromNumber(inputData []byte) (mantissa uint64, negative bool, exponent int,
 		if negative {
 			digit100 = 100 - digit100
 		}
-
 		mantissa, carry = addDigitToMantissa(mantissa, digit100/10)
 		if carry {
 			break
 		}
 		mantissaDigits++
-
 		mantissa, carry = addDigitToMantissa(mantissa, digit100%10)
 		if carry {
 			break
 		}
 		mantissaDigits++
 	}
-
 	exponent = exponent*2 - mantissaDigits // Adjust exponent to the retrieved mantissa
 	return mantissa, negative, exponent, mantissaDigits + firstDigitWasZero, nil
 }
@@ -147,7 +139,6 @@ func DecodeDouble(inputData []byte) float64 {
 		return -float64(mantissa) * math.Pow10(exponent)
 	}
 	return float64(mantissa) * math.Pow10(exponent)
-
 }
 
 // DecodeInt convert NUMBER to int64
@@ -157,7 +148,6 @@ func DecodeInt(inputData []byte) int64 {
 	if err != nil || exponent < 0 {
 		return 0
 	}
-
 	for exponent > 0 {
 		mantissa *= 10
 		exponent--
@@ -178,21 +168,19 @@ func DecodeInt(inputData []byte) int64 {
 // Ex When parsing a float into an int64, the driver will try to cast the float64 into the int64.
 // If the float64 can't be represented by an int64, Parse will issue an error "invalid syntax"
 func DecodeNumber(inputData []byte) interface{} {
-	var powerOfTen = [...]uint64{
+	powerOfTen := [...]uint64{
 		1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
 		10000000000, 100000000000, 1000000000000, 10000000000000, 100000000000000,
 		1000000000000000, 10000000000000000, 100000000000000000, 1000000000000000000,
-		10000000000000000000}
-
+		10000000000000000000,
+	}
 	mantissa, negative, exponent, mantissaDigits, err := FromNumber(inputData)
 	if err != nil {
 		return math.NaN()
 	}
-
 	if mantissaDigits == 0 {
 		return int64(0)
 	}
-
 	if exponent >= 0 && exponent < len(powerOfTen) {
 		// exponent = mantissaDigits - exponent
 		IntMantissa := mantissa
@@ -205,40 +193,33 @@ func DecodeNumber(inputData []byte) interface{} {
 		if over != 0 {
 			goto fallbackToFloat
 		}
-
 		if negative && (IntMantissa>>63) == 0 {
 			return -int64(IntMantissa)
 		}
 		return int64(IntMantissa)
 	}
-
 fallbackToFloat:
 	if negative {
 		return -float64(mantissa) * math.Pow10(exponent)
 	}
-
 	return float64(mantissa) * math.Pow10(exponent)
 }
 
 // ToNumber encode mantissa, sign and exponent as a []byte expected by Oracle
 func ToNumber(mantissa []byte, negative bool, exponent int) []byte {
-
 	if len(mantissa) == 0 {
 		return []byte{128}
 	}
-
 	if exponent%2 == 0 {
 		mantissa = append([]byte{'0'}, mantissa...)
 	} else {
 	}
-
 	mantissaLen := len(mantissa)
 	size := 1 + (mantissaLen+1)/2
 	if negative && mantissaLen < 21 {
 		size++
 	}
 	buf := make([]byte, size, size)
-
 	for i := 0; i < mantissaLen; i += 2 {
 		b := 10 * (mantissa[i] - '0')
 		if i < mantissaLen-1 {
@@ -249,11 +230,9 @@ func ToNumber(mantissa []byte, negative bool, exponent int) []byte {
 		}
 		buf[1+i/2] = b + 1
 	}
-
 	if negative && mantissaLen < 21 {
 		buf[len(buf)-1] = 0x66
 	}
-
 	if exponent < 0 {
 		exponent--
 	}
@@ -293,7 +272,6 @@ func EncodeDouble(num float64) ([]byte, error) {
 	if num == 0.0 {
 		return []byte{128}, nil
 	}
-
 	var (
 		exponent int
 		err      error

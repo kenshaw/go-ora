@@ -1,8 +1,7 @@
+// +build ignore
+
+// Command gen generates test values for oracle number types.
 package main
-
-/*  This program generate tests values for oracle NUMBER type
-
- */
 
 import (
 	"database/sql"
@@ -17,7 +16,7 @@ import (
 	_ "github.com/sijms/go-ora"
 )
 
-var testValues = []struct {
+var values = []struct {
 	asString string
 	asFloat  float64
 }{
@@ -130,35 +129,28 @@ type tmplRow struct {
 	Binary     string
 }
 
-const (
-	maxConvertibleInt = 9223372036854774784
-)
+const maxConvertibleInt = 9223372036854774784
 
 func main() {
 	packageName := "converters"
 	if len(os.Args) >= 2 {
 		packageName = os.Args[1]
 	}
-
 	connStr := os.Getenv("GOORA_TESTDB")
 	if connStr == "" {
-		checkErr(fmt.Errorf("Provide  oracle server url in environment variable GOORA_TESTDB"))
+		checkErr(fmt.Errorf("Provide oracle server url in environment variable GOORA_TESTDB"))
 	}
 	conn, err := sql.Open("oracle", connStr)
 	checkErr(err)
 	defer conn.Close()
-
 	result := []tmplRow{}
-
-	for _, tt := range testValues {
+	for _, tt := range values {
 		query := fmt.Sprintf("select N||'' S, N, dump(n) D from (select %s N from DUAL)", tt.asString)
 		stmt, err := conn.Prepare(query)
 		checkErr(err)
-
 		fmt.Println(query)
 		rows, err := stmt.Query()
 		checkErr(err)
-
 		if !rows.Next() {
 			checkErr(fmt.Errorf("Query: %s must return a row", query))
 		}
@@ -169,10 +161,8 @@ func main() {
 			isInteger bool
 			dump      string
 		)
-
 		err = rows.Scan(&asString, &asFloat, &dump)
 		checkErr(err)
-
 		// Check oracle representation to test if number is Int
 		if i := strings.Index(asString, "."); i == -1 {
 			isInteger = true
@@ -186,7 +176,6 @@ func main() {
 				err = nil
 			}
 		}
-
 		if i := strings.Index(dump, ": "); i > 0 {
 			dump = dump[i+2:]
 		}
@@ -198,11 +187,9 @@ func main() {
 			isInteger,
 			dump,
 		})
-
 		rows.Close()
 		stmt.Close()
 	}
-
 	outFile := "testfloatsvalues.go"
 	if len(os.Args) > 3 {
 		outFile = os.Args[2]
@@ -210,14 +197,11 @@ func main() {
 	out, err := os.Create(outFile)
 	checkErr(err)
 	defer out.Close()
-
 	tmpltext := `package {{.Package}}
-
 /* This file is generated.
 	move to converters directory and 
     go run .\generatefloat\main.go {{.Package}}
 */
-
 var TestFloatValue = []struct {
 	SelectText string
 	OracleText string
@@ -230,13 +214,10 @@ var TestFloatValue = []struct {
 	{ "{{.SelectText}}", "{{.OracleText}}", {{printf "%g" .Float}},  {{.Integer}}, {{.IsInteger}},  []byte{ {{.Binary}} } },  // {{printf "%e" .Float}}
 	{{- end }}
 }`
-
 	tmpl, err := template.New("master").Parse(tmpltext)
 	checkErr(err)
-
 	err = tmpl.Execute(out, struct {
 		Package string
 		Values  []tmplRow
 	}{packageName, result})
-
 }

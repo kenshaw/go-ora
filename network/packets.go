@@ -2,10 +2,12 @@ package network
 
 import "encoding/binary"
 
+// PacketType
 type PacketType uint8
 
+// PacketInterface
 type PacketInterface interface {
-	bytes() []byte
+	Bytes() []byte
 	getPacketType() PacketType
 }
 
@@ -26,14 +28,14 @@ const (
 )
 
 type Packet struct {
-	//sessionCtx SessionContext
+	// sessionCtx SessionContext
 	dataOffset uint16
 	length     uint16
 	packetType PacketType
 	flag       uint8
-	//NSPFSID    int
-	//buffer     []byte
-	//SID        []byte
+	// NSPFSID    int
+	// buffer     []byte
+	// SID        []byte
 }
 
 //const (
@@ -44,7 +46,6 @@ type Packet struct {
 //	NSPFPRB   = 0x10
 //	NSPSID_SZ = 0x10
 //)
-
 func newPacket(packetData []byte) *Packet {
 	return &Packet{
 		length:     binary.BigEndian.Uint16(packetData),
@@ -53,7 +54,7 @@ func newPacket(packetData []byte) *Packet {
 	}
 }
 
-func (pck *Packet) bytes() []byte {
+func (pck *Packet) Bytes() []byte {
 	output := make([]byte, 8)
 	if pck.dataOffset > 8 {
 		output = append(output, make([]byte, pck.dataOffset-8)...)
@@ -63,6 +64,7 @@ func (pck *Packet) bytes() []byte {
 	output[5] = pck.flag
 	return output
 }
+
 func (pck *Packet) getPacketType() PacketType {
 	return pck.packetType
 }

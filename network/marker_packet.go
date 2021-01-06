@@ -4,14 +4,14 @@ import "encoding/binary"
 
 type MarkerPacket struct {
 	packet Packet
-	//length     uint16
-	//packetType PacketType
-	//flag       uint8
+	// length     uint16
+	// packetType PacketType
+	// flag       uint8
 	markerData uint8
 	markerType uint8
 }
 
-func (pck *MarkerPacket) bytes() []byte {
+func (pck *MarkerPacket) Bytes() []byte {
 	return []byte{0, 0xB, 0, 0, 0xC, 0, 0, 0, pck.markerType, 0, pck.markerData}
 }
 
@@ -31,6 +31,7 @@ func newMarkerPacket(markerData uint8) *MarkerPacket {
 		markerData: markerData,
 	}
 }
+
 func newMarkerPacketFromData(packetData []byte) *MarkerPacket {
 	if len(packetData) != 0xB {
 		return nil
