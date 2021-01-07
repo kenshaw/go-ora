@@ -1,24 +1,27 @@
 // +build ignore
 
-// Command gen generates test values for oracle number types.
+// Command gen generates float test values for oracle number types.
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"errors"
+	"flag"
 	"fmt"
+	"go/format"
+	"io/ioutil"
 	"math"
 	"os"
 	"strconv"
 	"strings"
-	"text/template"
 
 	_ "github.com/sijms/go-ora"
 )
 
 var values = []struct {
-	asString string
-	asFloat  float64
+	S string
+	F float64
 }{
 	{"0", 0},
 	{"1", 1},
@@ -113,111 +116,115 @@ var values = []struct {
 	// {"-9223372036854775808", -9223372036854775808},
 }
 
-func checkErr(err error) {
-	if err != nil {
-		fmt.Println(err)
+const maxConvertibleInt = 9223372036854774784
+
+func main() {
+	dsn := flag.String("dsn", "oracle://system:P4ssw0rd@localhost/orasid", "dsn")
+	dest := flag.String("dest", "values_test.go", "dest file")
+	flag.Parse()
+	if err := run(*dsn, *dest); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-type tmplRow struct {
+func run(dsn, dest string) error {
+	if dsn == "" {
+		dsn = os.Getenv("GOORA_TESTDB")
+	}
+	if dsn == "" {
+		return errors.New("must provide -dsn or define $ENV{GOORA_TESTDB}")
+	}
+	db, err := sql.Open("oracle", dsn)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	var tests []floatTest
+	for _, v := range values {
+		q := fmt.Sprintf("select N||'' S, N, dump(n) D from (select %s N from DUAL)", v.S)
+		rows, err := db.Query(q)
+		if err != nil {
+			return err
+		}
+		if !rows.Next() {
+			return fmt.Errorf("query %q did not return a row", q)
+		}
+		var row struct {
+			S       string
+			F       float64
+			AsInt64 int64
+			IsInt   bool
+			dump    string
+		}
+		if err := rows.Scan(&row.S, &row.F, &row.dump); err != nil {
+			return err
+		}
+		// Check oracle representation to test if number is Int
+		if i := strings.Index(row.S, "."); i == -1 {
+			row.IsInt = true
+			var err error
+			row.AsInt64, err = strconv.ParseInt(row.S, 10, 64)
+			if err != nil || row.AsInt64 >= 9000000000000000000 || row.AsInt64 <= -9000000000000000000 {
+				if err != nil && !errors.Is(err, strconv.ErrRange) {
+					return err
+				}
+				row.IsInt, row.AsInt64 = false, 0
+
+			}
+		}
+		if i := strings.Index(row.dump, ": "); i > 0 {
+			row.dump = row.dump[i+2:]
+		}
+		tests = append(tests, floatTest{
+			v.S,
+			row.S,
+			v.F,
+			row.AsInt64,
+			row.IsInt,
+			row.dump,
+		})
+		if err := rows.Close(); err != nil {
+			return err
+		}
+	}
+	buf := new(bytes.Buffer)
+	fmt.Fprintln(buf, hdr)
+	fmt.Fprintln(buf, "func floatTests() []floatTest {")
+	fmt.Fprintln(buf, "\treturn []floatTest{")
+	for _, test := range tests {
+		fmt.Fprintf(
+			buf, "\t\t{%q, %q, %g, %d, %t, []byte{%s}}, // %e\n",
+			test.SelectText, test.OracleText, test.Float, test.Int64, test.IsInt, test.Binary, test.Float,
+		)
+	}
+	fmt.Fprintln(buf, "\t}\n}")
+	out, err := format.Source(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(dest, out, 0o644)
+}
+
+type floatTest struct {
 	SelectText string
 	OracleText string
 	Float      float64
-	Integer    int64
-	IsInteger  bool
+	Int64      int64
+	IsInt      bool
 	Binary     string
 }
 
-const maxConvertibleInt = 9223372036854774784
+const hdr = `package ora
 
-func main() {
-	packageName := "converters"
-	if len(os.Args) >= 2 {
-		packageName = os.Args[1]
-	}
-	connStr := os.Getenv("GOORA_TESTDB")
-	if connStr == "" {
-		checkErr(fmt.Errorf("Provide oracle server url in environment variable GOORA_TESTDB"))
-	}
-	conn, err := sql.Open("oracle", connStr)
-	checkErr(err)
-	defer conn.Close()
-	result := []tmplRow{}
-	for _, tt := range values {
-		query := fmt.Sprintf("select N||'' S, N, dump(n) D from (select %s N from DUAL)", tt.asString)
-		stmt, err := conn.Prepare(query)
-		checkErr(err)
-		fmt.Println(query)
-		rows, err := stmt.Query()
-		checkErr(err)
-		if !rows.Next() {
-			checkErr(fmt.Errorf("Query: %s must return a row", query))
-		}
-		var (
-			asString  string
-			asFloat   float64
-			asInt64   int64
-			isInteger bool
-			dump      string
-		)
-		err = rows.Scan(&asString, &asFloat, &dump)
-		checkErr(err)
-		// Check oracle representation to test if number is Int
-		if i := strings.Index(asString, "."); i == -1 {
-			isInteger = true
-			asInt64, err = strconv.ParseInt(asString, 10, 64)
-			if err != nil || asInt64 >= 9000000000000000000 || asInt64 <= -9000000000000000000 {
-				if err != nil && !errors.Is(err, strconv.ErrRange) {
-					checkErr(err)
-				}
-				isInteger = false
-				asInt64 = 0
-				err = nil
-			}
-		}
-		if i := strings.Index(dump, ": "); i > 0 {
-			dump = dump[i+2:]
-		}
-		result = append(result, tmplRow{
-			tt.asString,
-			asString,
-			tt.asFloat,
-			asInt64,
-			isInteger,
-			dump,
-		})
-		rows.Close()
-		stmt.Close()
-	}
-	outFile := "testfloatsvalues.go"
-	if len(os.Args) > 3 {
-		outFile = os.Args[2]
-	}
-	out, err := os.Create(outFile)
-	checkErr(err)
-	defer out.Close()
-	tmpltext := `package {{.Package}}
-/* This file is generated.
-	move to converters directory and 
-    go run .\generatefloat\main.go {{.Package}}
-*/
-var TestFloatValue = []struct {
-	SelectText string
-	OracleText string
-	Float float64
-	Integer int64
-	IsInteger bool
-	Binary []byte
-}{
-	{{- range .Values}}
-	{ "{{.SelectText}}", "{{.OracleText}}", {{printf "%g" .Float}},  {{.Integer}}, {{.IsInteger}},  []byte{ {{.Binary}} } },  // {{printf "%e" .Float}}
-	{{- end }}
-}`
-	tmpl, err := template.New("master").Parse(tmpltext)
-	checkErr(err)
-	err = tmpl.Execute(out, struct {
-		Package string
-		Values  []tmplRow
-	}{packageName, result})
-}
+// Code generated by gen.go. DO NOT EDIT.
+
+type floatTest struct {    
+    SelectText string    
+    OracleText string    
+    Float      float64    
+    Int64      int64    
+    IsInt      bool    
+    Binary     []byte    
+}    
+`

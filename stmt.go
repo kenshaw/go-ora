@@ -84,15 +84,16 @@ func NewStmt(text string, conn *Conn) *Stmt {
 	}
 	// get stmt type
 	uCmdText := strings.TrimSpace(strings.ToUpper(text))
-	if strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH") {
+	switch {
+	case strings.HasPrefix(uCmdText, "SELECT") || strings.HasPrefix(uCmdText, "WITH"):
 		stmt.typ = StmtSELECT
-	} else if strings.HasPrefix(uCmdText, "UPDATE") ||
+	case strings.HasPrefix(uCmdText, "UPDATE") ||
 		strings.HasPrefix(uCmdText, "INSERT") ||
-		strings.HasPrefix(uCmdText, "DELETE") {
+		strings.HasPrefix(uCmdText, "DELETE"):
 		stmt.typ = StmtDML
-	} else if strings.HasPrefix(uCmdText, "DECLARE") || strings.HasPrefix(uCmdText, "BEGIN") {
+	case strings.HasPrefix(uCmdText, "DECLARE") || strings.HasPrefix(uCmdText, "BEGIN"):
 		stmt.typ = StmtPLQSL
-	} else {
+	default:
 		stmt.typ = StmtOTHERS
 	}
 	// returning cluase
@@ -214,9 +215,7 @@ func (stmt *Stmt) write(sess *network.Session) error {
 				stmt.al8i4[0] = 1
 			}
 			switch stmt.typ {
-			case StmtDML:
-				fallthrough
-			case StmtPLQSL:
+			case StmtDML, StmtPLQSL:
 				if stmt.arrayBindCount <= 1 {
 					stmt.al8i4[1] = 1
 				} else {
@@ -570,19 +569,8 @@ func (stmt *Stmt) read(res *Result) error {
 									// 	//	res.currentRow[x] = conv.DecodeDouble(temp)
 									// 	//}
 									// }
-								case TypeTimestamp:
-									fallthrough
-								case TypeTimestampDTY:
-									fallthrough
-								case TypeTimestampLTZ:
-									fallthrough
-								case TypeTimestampLTZ_DTY:
-									fallthrough
-								case TypeTimestampTZ:
-									fallthrough
-								case TypeTimestampTZ_DTY:
-									fallthrough
-								case TypeDATE:
+								case TypeTimestamp, TypeTimestampDTY, TypeTimestampLTZ,
+									TypeTimestampLTZ_DTY, TypeTimestampTZ, TypeTimestampTZ_DTY, TypeDATE:
 									dateVal, err := conv.DecodeDate(temp)
 									if err != nil {
 										return err
@@ -1378,23 +1366,8 @@ func (p *Param) read(sess *network.Session) error {
 	// precision, err := session.GetInt(1, false, false)
 	// var scale int
 	switch p.DataType {
-	case TypeNUMBER:
-		fallthrough
-	case TypeTimestampDTY:
-		fallthrough
-	case TypeTimestampTZ_DTY:
-		fallthrough
-	case TypeIntervalDS_DTY:
-		fallthrough
-	case TypeTimestamp:
-		fallthrough
-	case TypeTimestampTZ:
-		fallthrough
-	case TypeIntervalDS:
-		fallthrough
-	case TypeTimestampLTZ_DTY:
-		fallthrough
-	case TypeTimestampLTZ:
+	case TypeNUMBER, TypeTimestampDTY, TypeTimestampTZ_DTY, TypeIntervalDS_DTY,
+		TypeTimestamp, TypeTimestampTZ, TypeIntervalDS, TypeTimestampLTZ_DTY, TypeTimestampLTZ:
 		if scale, err := sess.GetInt(2, true, true); err != nil {
 			return err
 		} else {
@@ -1433,13 +1406,7 @@ func (p *Param) read(sess *network.Session) error {
 		p.MaxLen = 8
 	case TypeTimestampTZ_DTY:
 		p.MaxLen = 13
-	case TypeIntervalYM_DTY:
-		fallthrough
-	case TypeIntervalDS_DTY:
-		fallthrough
-	case TypeIntervalYM:
-		fallthrough
-	case TypeIntervalDS:
+	case TypeIntervalYM_DTY, TypeIntervalDS_DTY, TypeIntervalYM, TypeIntervalDS:
 		p.MaxLen = 11
 	}
 	p.MaxNoOfArrayElements, err = sess.GetInt(4, true, true)

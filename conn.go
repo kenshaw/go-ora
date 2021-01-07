@@ -231,47 +231,47 @@ func (conn *Conn) Ping(ctx context.Context) error {
 
 func (conn *Conn) Logoff() error {
 	conn.connOption.Tracer.Print("Logoff")
-	session := conn.sess
-	session.ResetBuffer()
-	session.PutBytes(
+	sess := conn.sess
+	sess.ResetBuffer()
+	sess.PutBytes(
 		0x11, 0x87, 0, 0, 0, 0x2, 0x1,
 		0x11, 0x1,
 		0, 0, 0, 0x1,
 		0, 0, 0, 0, 0, 0x1,
 		0, 0, 0, 0, 0, 3, 9, 0,
 	)
-	err := session.Write()
+	err := sess.Write()
 	if err != nil {
 		return err
 	}
 loop:
 	for {
-		msg, err := session.GetByte()
+		msg, err := sess.GetByte()
 		if err != nil {
 			return err
 		}
 		switch msg {
 		case 4:
-			session.Summary, err = network.NewSummary(session)
+			sess.Summary, err = network.NewSummary(sess)
 			if err != nil {
 				return err
 			}
 			break loop
 		case 9:
-			if session.HasEOSCapability {
-				if session.Summary == nil {
-					session.Summary = new(network.SummaryObject)
+			if sess.HasEOSCapability {
+				if sess.Summary == nil {
+					sess.Summary = new(network.SummaryObject)
 				}
-				session.Summary.EndOfCallStatus, err = session.GetInt(4, true, true)
+				sess.Summary.EndOfCallStatus, err = sess.GetInt(4, true, true)
 				if err != nil {
 					return err
 				}
 			}
-			if session.HasFSAPCapability {
-				if session.Summary == nil {
-					session.Summary = new(network.SummaryObject)
+			if sess.HasFSAPCapability {
+				if sess.Summary == nil {
+					sess.Summary = new(network.SummaryObject)
 				}
-				session.Summary.EndToEndECIDSequence, err = session.GetInt(2, true, true)
+				sess.Summary.EndToEndECIDSequence, err = sess.GetInt(2, true, true)
 				if err != nil {
 					return err
 				}
@@ -281,8 +281,8 @@ loop:
 			return fmt.Errorf("message code error: received code %d and expected code is 4, 9", msg)
 		}
 	}
-	if session.HasError() {
-		return errors.New(session.GetError())
+	if sess.HasError() {
+		return errors.New(sess.GetError())
 	}
 	return nil
 }
@@ -308,7 +308,7 @@ func (conn *Conn) Open() error {
 	}
 	// create string converter object
 	conn.strConv = conv.NewStringConverter(conn.tcpNego.ServerCharset)
-	conn.sess.StrConv = conn.strConv
+	conn.sess.ErrDecoder = conn.strConv.Decode
 	conn.dataNego, err = buildTypeNego(conn.tcpNego, conn.sess)
 	if err != nil {
 		return err
@@ -643,9 +643,10 @@ func NewAuth(username string, password string, tcpNego *TCPNego, session *networ
 				if err != nil {
 					return nil, err
 				}
-				if bytes.Compare(key, []byte("AUTH_SESSKEY")) == 0 {
+				switch {
+				case bytes.Compare(key, []byte("AUTH_SESSKEY")) == 0:
 					auth.EServerSessKey = string(val)
-				} else if bytes.Compare(key, []byte("AUTH_VFR_DATA")) == 0 {
+				case bytes.Compare(key, []byte("AUTH_VFR_DATA")) == 0:
 					auth.Salt = string(val)
 					auth.VerifierType = num
 				}
@@ -657,12 +658,13 @@ func NewAuth(username string, password string, tcpNego *TCPNego, session *networ
 	var key []byte
 	padding := false
 	var err error
-	if auth.VerifierType == 2361 {
+	switch auth.VerifierType {
+	case 2361:
 		key, err = getKeyFromUserNameAndPassword(username, password)
 		if err != nil {
 			return nil, err
 		}
-	} else if auth.VerifierType == 6949 {
+	case 6949:
 		if auth.tcpNego.ServerCompileTimeCaps[4]&2 == 0 {
 			padding = true
 		}
@@ -678,7 +680,7 @@ func NewAuth(username string, password string, tcpNego *TCPNego, session *networ
 		}
 		key = hash.Sum(nil)           // 20 byte key
 		key = append(key, 0, 0, 0, 0) // 24 byte key
-	} else {
+	default:
 		return nil, errors.New("unsupported verifier type")
 	}
 	// get the server session key

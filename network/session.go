@@ -9,8 +9,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-
-	"github.com/sijms/go-ora/conv"
 )
 
 type Data interface {
@@ -43,7 +41,7 @@ type Session struct {
 	HasFSAPCapability bool
 	Summary           *SummaryObject
 	states            []sessionState
-	StrConv           *conv.StringConverter
+	ErrDecoder        func([]byte) string
 }
 
 func NewSession(connOption ConnectionOption) *Session {
@@ -259,8 +257,8 @@ func (session *Session) HasError() bool {
 
 func (session *Session) GetError() string {
 	if session.Summary != nil && session.Summary.RetCode != 0 {
-		if session.StrConv != nil {
-			return session.StrConv.Decode(session.Summary.ErrorMessage)
+		if session.ErrDecoder != nil {
+			return session.ErrDecoder(session.Summary.ErrorMessage)
 		} else {
 			return string(session.Summary.ErrorMessage)
 		}
@@ -423,10 +421,8 @@ func (session *Session) readPacket() (PacketInterface, error) {
 				return nil, errors.New(session.GetError())
 			}
 		}
-		fallthrough
-	default:
-		return nil, nil
 	}
+	return nil, nil
 }
 
 func (session *Session) PutBytes(data ...byte) {

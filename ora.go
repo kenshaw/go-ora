@@ -98,9 +98,7 @@ func ConfigFromString(s string) (Config, error) {
 			config.Privilege = PrivilegeFromString(val)
 		case "ENLIST":
 			config.Enlist = EnlistFromString(val)
-		case "CONNECT TIMEOUT":
-			fallthrough
-		case "CONNECTION TIMEOUT":
+		case "CONNECT TIMEOUT", "CONNECTION TIMEOUT":
 			var err error
 			config.ConnectionTimeOut, err = strconv.Atoi(val)
 			if err != nil {
