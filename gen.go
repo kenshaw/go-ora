@@ -1,5 +1,4 @@
 // +build ignore
-
 // Command gen generates float test values for oracle number types.
 package main
 
@@ -71,10 +70,9 @@ func run(dsn, dest string) error {
 					return err
 				}
 				row.IsInt, row.AsInt64 = false, 0
-
 			}
 		}
-		if i := strings.Index(row.dump, ": "); i > 0 {
+		if i := strings.Index(row.dump, ": "); i != -1 {
 			row.dump = row.dump[i+2:]
 		}
 		tests = append(tests, floatTest{
